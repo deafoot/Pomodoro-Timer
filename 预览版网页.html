@@ -1,0 +1,2517 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>番茄钟 · 优化版 v12</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f5f5f7;
+    --surface: #fff;
+    --surface-2: #fafafa;
+    --window: #fafafa;
+    --window-text: #1d1d1f;
+    --text: #1d1d1f;
+    --muted: #666;
+    --border: #e0e0e0;
+    --soft: #f0f0f2;
+    --focus: #e53e3e;
+    --short: #38a169;
+    --long: #3182ce;
+    --pause: #718096;
+  }
+  body {
+    font-family: var(--ui-font-family, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif);
+    font-size: var(--ui-font-size, 15px);
+    font-weight: var(--ui-font-weight, 500);
+    background: var(--bg);
+    color: var(--text);
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+  }
+  .app {
+    width: 100%;
+    max-width: 520px;
+    background: var(--surface);
+    border-radius: 20px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.06);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: fit-content;
+  }
+
+  /* ============ 顶部导航 ============ */
+  .top-nav {
+    display: flex;
+    border-bottom: 1px solid #eee;
+    background: var(--window);
+    flex-shrink: 0;
+  }
+  .top-nav button {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 16px 8px;
+    font-size: 14px;
+    cursor: pointer;
+    color: #888;
+    font-weight: 500;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .top-nav button .nav-icon { font-size: 16px; line-height: 1; }
+  .top-nav button.active { color: var(--short); }
+  .top-nav button.active::after {
+    content: "";
+    position: absolute;
+    bottom: 0; left: 20%; right: 20%;
+    height: 2px;
+    background: var(--short);
+    border-radius: 2px 2px 0 0;
+  }
+
+  /* ============ 通用 ============ */
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ============ 计时区 ============ */
+  .timer-area {
+    padding: 24px 24px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .mode-tabs {
+    display: inline-flex;
+    background: var(--window);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .mode-tabs button {
+    border: none;
+    background: transparent;
+    padding: 8px 16px;
+    font-size: 13px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--muted);
+    font-weight: 500;
+    font-family: inherit;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .mode-tabs button.active {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  }
+  .mode-tabs button.active[data-stage="focus"] { color: var(--focus); }
+  .mode-tabs button.active[data-stage="shortRest"] { color: var(--short); }
+  .mode-tabs button.active[data-stage="longRest"] { color: var(--long); }
+  .mode-tabs .mode-icon{display:none}
+  .mode-tabs button{transition:color .2s,border-color .2s,background .2s}
+
+  /* 活动选择 */
+  .activity-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 20px;
+    width: 100%;
+    justify-content: center;
+  }
+  .activity-select-wrap {
+    position: relative;
+    min-width: 140px;
+  }
+  .activity-select-wrap select,
+  .activity-select-wrap input {
+    width: 100%;
+    padding: 8px 32px 8px 16px;
+    font-size: 14px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--window);
+    color: var(--text);
+    outline: none;
+    font-family: inherit;
+    appearance: none;
+    cursor: pointer;
+    text-align: center;
+    text-align-last: center;
+    transition: border-color 0.2s;
+  }
+  .activity-select-wrap input {
+    cursor: text;
+    text-align: left;
+    padding: 8px 16px;
+  }
+  .activity-select-wrap select:focus,
+  .activity-select-wrap input:focus { border-color: #888; }
+  .activity-select-wrap::after {
+    content: "▾";
+    position: absolute;
+    right: 12px; top: 50%;
+    transform: translateY(-50%);
+    color: #888;
+    pointer-events: none;
+    font-size: 12px;
+  }
+  .activity-select-wrap.is-input::after { display: none; }
+  .activity-select-wrap .edit-input { display: none; }
+  .activity-select-wrap.is-input .edit-input { display: block; }
+  .activity-select-wrap.is-input select { display: none; }
+
+  .icon-btn {
+    width: 36px; height: 36px;
+    border: 1px solid var(--border);
+    background: var(--window);
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .icon-btn:hover { background: var(--soft); border-color: #aaa; }
+
+  /* 环形/条形/简洁 容器 */
+  .timer-visual {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: all 0.3s ease;
+  }
+  .timer-visual.ring {
+    width: 240px;
+    height: 240px;
+    margin: 0 auto 8px;
+  }
+  .timer-visual.bar {
+    width: 100%;
+    max-width: 300px;
+    min-height: 78px;
+    height: 78px;
+    margin: 0 auto 8px;
+    justify-content: center;
+    gap: 5px;
+  }
+  .timer-visual.simple {
+    width: 100%;
+    min-height: 78px;
+    height: 78px;
+    margin: 0 auto 8px;
+    justify-content: center;
+  }
+
+  /* 环形进度条 */
+  .timer-ring {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    transform: rotate(-90deg);
+  }
+  .timer-ring circle {
+    fill: none;
+    stroke-width: var(--graphic-thickness, 14px);
+    stroke-linecap: round;
+  }
+  .timer-ring .bg { stroke: #f0f0f2; }
+  .timer-ring .progress { transition: stroke-dashoffset 0.3s ease-out, stroke 0.3s; }
+
+  /* 条形进度条 */
+  .timer-bar-wrap {
+    width: 100%;
+    height: 14px;
+    background: var(--window);
+    border-radius: 7px;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .timer-bar-progress {
+    height: 100%;
+    width: 0%;
+    border-radius: 6px;
+    transition: width 0.3s ease-out, background 0.3s;
+  }
+
+  /* 时间显示 */
+  .time-display {
+    font-family: var(--pomo-font-family, inherit);
+    font-size: var(--pomo-font-size, 52px);
+    font-weight: var(--pomo-font-weight, 400);
+    letter-spacing: -1px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    transition: color 0.3s;
+    position: relative;
+    z-index: 1;
+  }
+
+  .time-display.focus { color: var(--focus); }
+  .time-display.shortRest { color: var(--short); }
+  .time-display.longRest { color: var(--long); }
+
+  .controls {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+  .btn {
+    border: none;
+    padding: 12px 28px;
+    border-radius: 14px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+    min-width: 90px;
+  }
+  .btn-primary { background: var(--focus); color: #fff; }
+  .btn-primary:hover { opacity: 0.9; }
+  .btn-primary:disabled { background: #ddd; cursor: not-allowed; }
+
+  /* 暂停状态按钮颜色 */
+  .btn-primary.paused-focus { background: #a0a0a5; }
+  .btn-primary.paused-rest { background: #6bbf8a; }
+
+  .btn-primary.shortRest-mode { background: var(--short); }
+  .btn-primary.longRest-mode { background: var(--long); }
+  .btn-ghost { background: var(--window); color: var(--muted); }
+  .btn-ghost:hover { background: var(--soft); }
+  .btn-ghost:disabled { background: var(--bg); color: #ccc; cursor: not-allowed; }
+
+  /* 统计卡片 */
+  .stats-row {
+    display: flex;
+    gap: 10px;
+    padding: 0 24px 20px;
+  }
+  .stat-card {
+    flex: 1;
+    background: var(--window);
+    border-radius: 14px;
+    padding: 16px 12px;
+    text-align: center;
+  }
+  .stat-card .stat-label {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 6px;
+  }
+  .stat-card .stat-value {
+    font-size: 22px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+  }
+  .stat-card .stat-value.focus { color: var(--focus); }
+  .stat-card .stat-value.rest { color: var(--short); }
+
+  /* 可折叠 */
+  .collapsible {
+    border-top: 1px solid #f0f0f0;
+    margin: 0 24px 16px;
+  }
+  .collapsible-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 0;
+    cursor: pointer;
+    user-select: none;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .collapsible-header .arrow {
+    font-size: 10px;
+    transition: transform 0.2s;
+    color: #888;
+  }
+  .collapsible.open .collapsible-header .arrow { transform: rotate(180deg); }
+  .collapsible-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.35s ease;
+  }
+  .collapsible.open .collapsible-body { max-height: 900px; }
+  .collapsible-body-inner { padding-bottom: 12px; }
+
+  /* ============ 紧凑方案卡片 ============ */
+  .plan-card {
+    background: var(--window);
+    border-radius: 14px;
+    padding: 16px;
+  }
+  .plan-head {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+    align-items: center;
+  }
+  .plan-head select,
+  .plan-head input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    background: var(--surface);
+    outline: none;
+    min-width: 0;
+  }
+  .plan-head input:focus, .plan-head select:focus { border-color: #888; }
+  .plan-head .mini-btn {
+    width: 36px; height: 36px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+    color: var(--muted);
+  }
+  .plan-head .mini-btn:hover { background: var(--soft); }
+  .plan-head .mini-btn.primary { 
+    background: var(--short); 
+    color: #fff; 
+    border-color: var(--short); 
+  }
+  .plan-head .mini-btn.primary:hover { background: #257a52; }
+  .plan-head .mini-btn.danger { color: var(--focus); }
+  .plan-head .mini-btn.danger:hover { background: #fdecea; }
+
+  .plan-params {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 16px;
+  }
+  .plan-param {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .plan-param > label { flex-shrink: 0; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .plan-param select.event-sel {
+    flex: 1;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: inherit;
+    background: var(--surface);
+    outline: none;
+    cursor: pointer;
+    min-width: 0;
+  }
+  .plan-param input.num {
+    width: 52px;
+    padding: 6px 6px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: inherit;
+    background: var(--surface);
+    outline: none;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .plan-param .unit { font-size: 12px; color: #888; flex-shrink: 0; }
+
+  .plan-sound-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid #eee;
+  }
+  .plan-sound-row > label { flex-shrink: 0; font-size: 12px; color: var(--muted); }
+  .plan-sound-row select {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: inherit;
+    background: var(--surface);
+    outline: none;
+    cursor: pointer;
+    min-width: 0;
+  }
+  .plan-sound-row .upload-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+  .plan-sound-row .upload-btn:hover { background: var(--soft); }
+
+  .plan-switches {
+    display: flex;
+    gap: 16px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid #eee;
+    flex-wrap: wrap;
+  }
+  .plan-switches .switch {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+  }
+  .plan-switches input[type="checkbox"] {
+    width: 15px; height: 15px;
+    accent-color: var(--short);
+    cursor: pointer;
+  }
+
+  /* ============ 设置页 ============ */
+  .settings-panel { padding: 24px; }
+  .settings-section { margin-bottom: 20px; }
+  .settings-section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 14px;
+  }
+
+  /* 视觉设置 */
+  .visual-options {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .visual-option {
+    flex: 1;
+    padding: 8px 10px;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    text-align: center;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--muted);
+    transition: all 0.2s;
+    background: var(--surface);
+  }
+  .visual-option:hover { border-color: #aaa; }
+  .visual-option.active {
+    border-color: var(--short);
+    background: #f0faf5;
+    color: var(--short);
+    font-weight: 500;
+  }
+  .switch-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+  }
+  .switch-row input[type="checkbox"] {
+    width: 16px; height: 16px;
+    accent-color: var(--short);
+    cursor: pointer;
+  }
+
+  /* 事件管理 */
+  .activity-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .activity-tag {
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--window);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .activity-tag .remove {
+    cursor: pointer;
+    color: #888;
+    font-size: 12px;
+    transition: color 0.2s;
+  }
+  .activity-tag .remove:hover { color: var(--focus); }
+  .activity-tag.add-tag {
+    background: transparent;
+    border: 1px dashed #ccc;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .activity-tag.add-tag:hover { border-color: #888; }
+
+  /* ============ 历史页 ============ */
+  .history-panel { padding: 24px; }
+  .history-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .filter-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .filter-row select,
+  .filter-row input {
+    flex: 1;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--window);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .filter-row select:focus, .filter-row input:focus { border-color: #888; }
+  .filter-row .date-btn {
+    flex: 1;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--window);
+    color: var(--text);
+    cursor: pointer;
+    text-align: left;
+    position: relative;
+    transition: border-color 0.2s;
+  }
+  .filter-row .date-btn:hover { border-color: #888; }
+
+  /* 日历 */
+  .calendar-popup {
+    position: absolute;
+    top: 100%; left: 0;
+    z-index: 50;
+    background: var(--surface);
+    border: 1px solid #eee;
+    border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+    padding: 16px;
+    margin-top: 6px;
+    display: none;
+    min-width: 280px;
+    color: var(--text);
+  }
+  .calendar-popup.show { display: block; }
+  .calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .calendar-header button {
+    border: none;
+    background: var(--window);
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--muted);
+    transition: background 0.2s;
+  }
+  .calendar-header button:hover { background: var(--soft); }
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+  .calendar-grid .day-name {
+    text-align: center;
+    font-size: 11px;
+    color: #888;
+    padding: 4px 0;
+  }
+  .calendar-grid .day {
+    text-align: center;
+    font-size: 13px;
+    padding: 6px 0;
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--text);
+    transition: all 0.15s;
+  }
+  .calendar-grid .day:hover { background: var(--window); }
+  .calendar-grid .day.selected { background: var(--short); color: #fff; }
+  .calendar-grid .day.other-month { color: #ccc; }
+  .calendar-grid .day.today { font-weight: 700; color: var(--short); }
+
+  /* 批量操作 */
+  .batch-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--window);
+    border-radius: 12px;
+    margin-bottom: 14px;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .batch-bar label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    color: var(--muted);
+    user-select: none;
+  }
+  .batch-bar input[type="checkbox"] {
+    width: 16px; height: 16px;
+    accent-color: var(--short);
+    cursor: pointer;
+  }
+  .batch-bar .batch-actions { margin-left: auto; display: flex; gap: 8px; }
+  .batch-bar .batch-actions button {
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--muted);
+    transition: all 0.2s;
+  }
+  .batch-bar .batch-actions button.danger { color: var(--focus); border-color: #f5c6c0; }
+  .batch-bar .batch-actions button:hover { background: var(--soft); }
+
+  /* 历史列表 */
+  .history-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    border-radius: 12px;
+    margin-bottom: 8px;
+    background: var(--window);
+    color: var(--text);
+    transition: background 0.15s;
+  }
+  .history-item:hover { background: var(--soft); }
+  .history-item.selected { background: #e8f5ee; }
+  .history-item input[type="checkbox"] {
+    width: 16px; height: 16px;
+    accent-color: var(--short);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .history-dot {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .history-dot.focus { background: #fdecea; }
+  .history-dot.rest { background: #e8f5ee; }
+  .history-info { flex: 1; min-width: 0; }
+  .history-name {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text);
+  }
+  .history-meta { font-size: 12px; color: #888; }
+  .history-duration {
+    font-size: 15px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+  .history-duration.focus { color: var(--focus); }
+  .history-duration.rest { color: var(--short); }
+
+  .history-empty {
+    text-align: center;
+    color: #aaa;
+    padding: 40px 0;
+    font-size: 14px;
+  }
+
+  .history-stats {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 14px;
+    background: var(--window);
+    border-radius: 12px;
+  }
+  .stat { flex: 1; text-align: center; }
+  .stat-value {
+    font-size: 20px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-value.focus { color: var(--focus); }
+  .stat-value.rest { color: var(--short); }
+  .stat-label { font-size: 11px; color: #888; margin-top: 2px; }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: #1d1d1f;
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-size: 14px;
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+    pointer-events: none;
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+  /* 折叠面板 */
+  .section-collapsible .collapsible-body { max-height: 0; }
+  .section-collapsible.open .collapsible-body { max-height: 2000px; }
+
+  /* ===== 新视觉设置 ===== */
+  .settings-section-title .section-title-main{display:flex;align-items:center;gap:8px}
+  .section-icon{font-size:16px}
+  .theme-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+  .theme-card{border:2px solid var(--border);border-radius:12px;padding:10px;cursor:pointer;background:var(--surface);min-height:76px;position:relative}
+  .theme-card.active{border-color:var(--focus);box-shadow:0 0 0 2px color-mix(in srgb,var(--focus) 15%,transparent)}
+  .theme-name{font-size:12px;color:var(--muted);margin-bottom:8px}
+  .swatches{display:flex;height:28px;border-radius:8px;overflow:hidden}
+  .swatches span{flex:1}
+  .theme-custom-list{display:grid;gap:10px}
+  .custom-theme-row{border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--window)}
+  .custom-theme-name{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font:inherit;outline:none;margin-bottom:9px}
+  .custom-theme-colors{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+  .custom-color-item{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:var(--muted)}
+  .custom-theme-row input[type=color]{width:100%;height:28px;padding:2px;border:1px solid var(--border);border-radius:7px;background:var(--surface);cursor:pointer}
+  .theme-add{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px dashed var(--border);border-radius:7px;background:transparent;cursor:pointer}
+  .custom-title-row{display:flex;align-items:center;justify-content:space-between}
+  .theme-new-btn{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:8px;padding:6px 10px;cursor:pointer}
+  .custom-theme-actions{display:flex;justify-content:space-between;gap:8px;margin-top:9px}
+  .custom-theme-actions button{flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);cursor:pointer}
+  .custom-theme-actions .use-btn{background:var(--focus);border-color:var(--focus);color:#fff}
+  .custom-theme-actions .delete-btn{color:#c53030}
+  .settings-divider{height:1px;background:var(--border);margin:14px 0}
+  .settings-subtitle{font-size:12px;color:var(--muted);margin:12px 0 8px;font-weight:600}
+  .visual-subsection{border:1px solid var(--border);border-radius:10px;margin:10px 0;overflow:hidden;background:var(--surface)}
+  .visual-subtitle{display:flex;align-items:center;justify-content:space-between;padding:11px 12px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text)}
+  .visual-subtitle .sub-arrow{transition:transform .2s;color:var(--muted)}
+  .visual-subsection.open .sub-arrow{transform:rotate(180deg)}
+  .visual-subbody{display:none;padding:0 12px 12px}
+  .visual-subsection.open .visual-subbody{display:block}
+  .visual-mode-options{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .visual-mode-card{border:1px solid var(--border);border-radius:9px;padding:9px 8px;text-align:center;cursor:pointer;background:var(--surface);color:var(--text);font:inherit;font-size:13px}
+  .visual-mode-card:hover{border-color:var(--focus)}
+  .visual-mode-card.active{border-color:var(--focus);box-shadow:0 0 0 2px color-mix(in srgb,var(--focus) 12%,transparent)}
+  
+  .range-row{display:grid;grid-template-columns:70px 1fr 52px;align-items:center;gap:10px;margin:12px 0}
+  .range-row input[type=range]{width:100%;accent-color:var(--focus)}
+  .range-value{text-align:center;padding:5px 4px;border:1px solid var(--border);border-radius:7px;background:var(--window);font-variant-numeric:tabular-nums}
+  .font-preview{padding:12px;border:1px dashed var(--border);border-radius:8px;margin-top:10px;text-align:center;background:var(--window)}
+  .font-group-title{font-size:12px;color:var(--muted);font-weight:600;margin:12px 0 6px}
+  .font-grid{display:grid;grid-template-columns:1fr;gap:8px}
+  .font-grid select{padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit}
+  .theme-actions{display:flex;gap:8px;margin-top:10px}
+  .theme-save-btn{padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);cursor:pointer}
+  .theme-save-btn.primary{background:var(--focus);border-color:var(--focus);color:#fff}
+  
+  /* 保存预设的删除按钮 */
+  .saved-theme-grid { display: grid; grid-template-columns: repeat(3,1fr); gap:10px; margin-bottom:12px; }
+  .preset-card-wrap { position: relative; }
+  .theme-card { position: relative; }
+  .preset-delete {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 26px;
+    height: 26px;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.75;
+    transition: all 0.15s;
+    z-index: 3;
+    padding: 0;
+    font-family: inherit;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+  }
+  .preset-delete:hover {
+    background: var(--focus);
+    border-color: var(--focus);
+    color: #fff;
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  .saved-theme-grid .theme-card { padding-right: 40px; }
+  
+  /* 主题卡片中的7色选择器 */
+  .theme-card .theme-color-picker {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+    margin-top: 6px;
+  }
+  .theme-card .theme-color-picker input[type="color"] {
+    width: 100%;
+    height: 18px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px;
+    cursor: pointer;
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .theme-card .theme-color-picker input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 0;
+  }
+  .theme-card .theme-color-picker input[type="color"]::-webkit-color-swatch {
+    border: none;
+    border-radius: 3px;
+  }
+  .theme-card .picker-label {
+    font-size: 7px;
+    text-align: center;
+    color: var(--muted);
+    margin-top: 1px;
+  }
+  
+  .activity-add-editor{display:flex;gap:8px;align-items:center;margin-top:8px;width:100%}
+  .activity-add-editor input{flex:1;min-width:120px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font:inherit;outline:none}
+  .activity-add-editor button{padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);cursor:pointer;font:inherit}
+  .activity-add-editor .confirm{background:var(--focus);border-color:var(--focus);color:#fff}
+  .mode-icon{display:none}
+  body.hide-all-text .top-nav button .nav-label,
+  body.hide-all-text .stats-row .stat-label,
+  body.hide-all-text .controls .btn .btn-label,
+  body.hide-all-text .collapsible-header .title-text,
+  body.hide-all-text .visual-option .visual-label,
+  body.hide-all-text .mode-tabs .mode-label{display:none}
+  body.hide-all-text .mode-tabs .mode-icon{display:inline;font-size:17px}
+  body.hide-all-text .top-nav button{gap:0}
+  body.hide-all-text .mode-tabs button{padding:8px 14px}
+  body.hide-all-text .stats-row .stat-card{padding:12px}
+  .btn .btn-icon{font-size:16px;margin-right:5px}
+  body.hide-all-text .btn .btn-icon{margin-right:0}
+  .timer-visual.bar{gap:10px}
+  .timer-visual.bar .timer-bar-wrap{order:2;margin-bottom:0}
+  .timer-visual.bar .time-display{order:1}
+  .visual-option{display:flex;flex-direction:column;gap:5px;align-items:center}
+  .visual-preview{width:42px;height:28px;display:flex;align-items:center;justify-content:center}
+  .preview-ring{width:25px;height:25px;border:5px solid var(--focus);border-radius:50%}
+  .preview-bar{width:38px;height:7px;background:var(--focus);border-radius:4px}
+  .preview-simple{font-size:19px;font-weight:600;color:var(--focus)}
+  .color-note{font-size:11px;color:var(--muted);margin-top:6px}
+  @media(max-width:480px){.font-grid{grid-template-columns:1fr 1fr 1fr}}
+  body.dark{--bg:#1a202c;--surface:#232b3b;--surface-2:#202938;--window:#202938;--text:#f7fafc;--muted:#a8b0bd;--border:#3a4352;--soft:#303947}
+  body.dark .timer-ring .bg{stroke:#343d4c}
+  body.dark .calendar-popup{background:var(--surface);color:var(--text)}
+  
+  /* 黑暗模式下修复 select / input 文字颜色 */
+  body.dark select,
+  body.dark input,
+  body.dark .plan-param select.event-sel,
+  body.dark .plan-param input.num,
+  body.dark .plan-head select,
+  body.dark .plan-head input,
+  body.dark .plan-sound-row select,
+  body.dark .filter-row select,
+  body.dark .filter-row input,
+  body.dark .font-grid select,
+  body.dark .activity-select-wrap select,
+  body.dark .activity-select-wrap input {
+    color: var(--text) !important;
+    background-color: var(--surface) !important;
+  }
+  body.dark select option {
+    background-color: var(--surface);
+    color: var(--text);
+  }
+  body.dark .plan-param label,
+  body.dark .plan-param .unit,
+  body.dark .plan-sound-row > label,
+  body.dark .plan-switches .switch,
+  body.dark .settings-subtitle,
+  body.dark .color-note,
+  body.dark .theme-name,
+  body.dark .visual-subtitle,
+  body.dark .settings-section-title,
+  body.dark .custom-color-item,
+  body.dark .font-group-title {
+    color: var(--muted) !important;
+  }
+  body.dark .plan-switches .switch input[type="checkbox"] {
+    accent-color: var(--short);
+  }
+  body.dark .activity-tag {
+    background: var(--window);
+    color: var(--text);
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <nav class="top-nav">
+    <button class="active" data-view="timer">
+      <span class="nav-icon">⏱</span><span class="nav-label">计时</span>
+    </button>
+    <button data-view="pomodoro">
+      <span class="nav-icon">🍅</span><span class="nav-label">番茄钟</span>
+    </button>
+    <button data-view="history">
+      <span class="nav-icon">📋</span><span class="nav-label">历史</span>
+    </button>
+    <button data-view="settings">
+      <span class="nav-icon">⚙️</span><span class="nav-label">设置</span>
+    </button>
+  </nav>
+
+  <!-- 视图 1：计时 -->
+  <div class="view active" id="view-timer">
+    <div class="timer-area">
+      <div class="mode-tabs">
+        <button class="active" data-mode="focus" data-view="timer"><span class="mode-label">专注</span><span class="mode-icon">🎯</span></button>
+        <button data-mode="rest" data-view="timer"><span class="mode-label">休息</span><span class="mode-icon">🌿</span></button>
+      </div>
+
+      <div class="activity-row">
+        <div class="activity-select-wrap" id="timerActivityWrap">
+          <select id="timerActivitySelect"></select>
+          <input class="edit-input" id="timerActivityInput" type="text" placeholder="输入活动名称，回车确认">
+        </div>
+        <button class="icon-btn" data-custom="timerActivityWrap" data-select="timerActivitySelect" data-input="timerActivityInput" title="自定义活动">✏️</button>
+      </div>
+
+      <div class="timer-visual simple" id="timerVisual">
+        <div class="time-display focus" id="timerDisplay">00:00</div>
+      </div>
+
+      <div class="controls">
+        <button class="btn btn-primary" id="timerStartBtn"><span class="btn-icon">▶</span><span class="btn-label">开始</span></button>
+        <button class="btn btn-ghost" id="timerSkipBtn"><span class="btn-icon">⏭</span><span class="btn-label">跳过</span></button>
+        <button class="btn btn-ghost" id="timerResetBtn" disabled><span class="btn-icon">↺</span><span class="btn-label">重置</span></button>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">今日专注</div>
+        <div class="stat-value focus" id="timerStatFocus">0 分</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">今日休息</div>
+        <div class="stat-value rest" id="timerStatRest">0 分</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 视图 2：番茄钟 -->
+  <div class="view" id="view-pomodoro">
+    <div class="timer-area">
+      <div class="mode-tabs" id="pomoModeTabs">
+        <button class="active" data-stage="focus"><span class="mode-label">专注</span><span class="mode-icon">🎯</span></button>
+        <button data-stage="shortRest"><span class="mode-label">短休息</span><span class="mode-icon">🌿</span></button>
+        <button data-stage="longRest"><span class="mode-label">长休息</span><span class="mode-icon">☕</span></button>
+      </div>
+
+      <div class="activity-row">
+        <div class="activity-select-wrap" id="pomoActivityWrap">
+          <select id="pomoActivitySelect"></select>
+          <input class="edit-input" id="pomoActivityInput" type="text" placeholder="输入活动名称，回车确认">
+        </div>
+        <button class="icon-btn" data-custom="pomoActivityWrap" data-select="pomoActivitySelect" data-input="pomoActivityInput" title="自定义活动">✏️</button>
+      </div>
+
+      <div class="timer-visual ring" id="pomoVisual">
+        <svg class="timer-ring" viewBox="0 0 220 220" id="pomoRingSvg">
+          <circle class="bg" cx="110" cy="110" r="100"></circle>
+          <circle class="progress" id="pomoRingProgress" cx="110" cy="110" r="100" stroke="#d94f3d"></circle>
+        </svg>
+        <div class="time-display focus" id="pomoDisplay">25:00</div>
+      </div>
+
+      <div class="controls">
+        <button class="btn btn-primary" id="pomoStartBtn"><span class="btn-icon">▶</span><span class="btn-label">开始</span></button>
+        <button class="btn btn-ghost" id="pomoSkipBtn"><span class="btn-icon">⏭</span><span class="btn-label">跳过</span></button>
+        <button class="btn btn-ghost" id="pomoResetBtn" disabled><span class="btn-icon">↺</span><span class="btn-label">重置</span></button>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">今日专注</div>
+        <div class="stat-value focus" id="pomoStatFocus">0 分</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">今日休息</div>
+        <div class="stat-value rest" id="pomoStatRest">0 分</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">当前循环</div>
+        <div class="stat-value" id="pomoStatCycle">1 / 4</div>
+      </div>
+    </div>
+
+    <div class="collapsible" id="pomoPresetCollapsible">
+      <div class="collapsible-header" data-toggle="pomoPresetCollapsible">
+        <span class="section-title-main"><span class="section-icon">📐</span><span class="title-text">计时方案</span></span>
+        <span class="arrow">▼</span>
+      </div>
+      <div class="collapsible-body">
+        <div class="collapsible-body-inner" id="pomoPresetBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 视图 3：历史 -->
+  <div class="view" id="view-history">
+    <div class="history-panel">
+      <div class="history-filters">
+        <div class="filter-row">
+          <select id="filterType">
+            <option value="">全部类型</option>
+            <option value="focus">专注</option>
+            <option value="rest">休息</option>
+          </select>
+        </div>
+        <div class="filter-row">
+          <select id="filterEvent">
+            <option value="">全部事件</option>
+          </select>
+        </div>
+        <div class="filter-row">
+          <div class="date-btn" id="filterDateBtn" style="position:relative;">
+            📅 选择日期范围
+            <div class="calendar-popup" id="calendarPopup"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="batch-bar">
+        <label><input type="checkbox" id="selectAll"> 全选</label>
+        <span id="selectedCount" style="color:#999;">已选 0 项</span>
+        <div class="batch-actions">
+          <button id="batchDeleteBtn" class="danger">删除</button>
+        </div>
+      </div>
+
+      <div class="history-stats" id="historyStats"></div>
+      <div class="history-list" id="historyList"></div>
+    </div>
+  </div>
+
+  <!-- 视图 4：设置 -->
+  <div class="view" id="view-settings">
+    <div class="settings-panel">
+      
+      <div class="settings-section section-collapsible" id="settingsPresetSection">
+        <div class="settings-section-title" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;" data-toggle="settingsPresetSection">
+          <span class="section-title-main"><span class="section-icon">📐</span><span class="title-text">计时方案</span></span>
+          <span class="arrow" style="font-size:10px;transition:transform 0.2s;">▼</span>
+        </div>
+        <div class="collapsible-body">
+          <div class="collapsible-body-inner" id="settingsPresetBody"></div>
+        </div>
+      </div>
+
+      <div class="settings-section section-collapsible" id="settingsEventSection">
+        <div class="settings-section-title" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;" data-toggle="settingsEventSection">
+          <span class="section-title-main"><span class="section-icon">🏷️</span><span class="title-text">事件管理</span></span>
+          <span class="arrow" style="font-size:10px;transition:transform 0.2s;">▼</span>
+        </div>
+        <div class="collapsible-body">
+          <div class="collapsible-body-inner">
+            <div class="activity-tags" id="allTags"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section section-collapsible" id="settingsVisualSection">
+        <div class="settings-section-title" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;" data-toggle="settingsVisualSection">
+          <span class="section-title-main"><span class="section-icon">🎨</span><span class="title-text">视觉设置</span></span>
+          <span class="arrow" style="font-size:10px;transition:transform 0.2s;">▼</span>
+        </div>
+        <div class="collapsible-body">
+          <div class="collapsible-body-inner">
+            <div class="visual-subsection" id="visualPomodoroSub">
+              <div class="visual-subtitle" data-visual-toggle="visualPomodoroSub"><span>番茄钟设置</span><span class="sub-arrow">▼</span></div>
+              <div class="visual-subbody">
+                <div class="visual-mode-options" id="visualModeOptions">
+                  <button type="button" class="visual-mode-card active" data-mode="simple">简洁</button>
+                  <button type="button" class="visual-mode-card" data-mode="bar">条形</button>
+                  <button type="button" class="visual-mode-card" data-mode="ring">环形</button>
+                </div>
+                <label class="switch-row"><input type="checkbox" id="hideNumberToggle"> 隐藏文字（仅图形模式生效）</label>
+              </div>
+            </div>
+
+            <div class="visual-subsection" id="visualColorSub">
+              <div class="visual-subtitle" data-visual-toggle="visualColorSub"><span>颜色设置</span><span class="sub-arrow">▼</span></div>
+              <div class="visual-subbody">
+                <div class="settings-subtitle">系统预设</div>
+                <div class="theme-grid" id="themeGrid"></div>
+                <div class="settings-subtitle">我的预设</div>
+                <div class="saved-theme-grid" id="savedThemeGrid"></div>
+                <div class="settings-subtitle custom-title-row"><span>自定义颜色</span><button class="theme-new-btn" id="addThemeBtn" type="button">＋ 新建</button></div>
+                <div class="theme-custom-list" id="customThemeList"></div>
+                <div class="theme-actions"><button class="theme-save-btn primary" id="saveThemePresetBtn">保存当前为预设</button></div>
+                <div class="settings-divider"></div>
+                <label class="switch-row"><input type="checkbox" id="darkModeToggle"> 黑暗模式</label>
+                <label class="switch-row" style="margin-top:8px;"><input type="checkbox" id="followSystemToggle"> 跟随系统</label>
+              </div>
+            </div>
+
+            <div class="visual-subsection" id="visualTextSub">
+              <div class="visual-subtitle" data-visual-toggle="visualTextSub"><span>文字设置</span><span class="sub-arrow">▼</span></div>
+              <div class="visual-subbody">
+                <div class="font-group-title">番茄钟字体设置</div>
+                <div class="font-grid">
+                  <select id="pomoFontFamilySelect">
+                    <option value='-apple-system,"PingFang SC","Microsoft YaHei",sans-serif'>系统默认</option>
+                    <option value='"Microsoft YaHei",sans-serif'>微软雅黑</option>
+                    <option value='"PingFang SC",sans-serif'>苹方</option>
+                    <option value='Arial,sans-serif'>Arial</option>
+                    <option value='Georgia,serif'>Georgia</option>
+                  </select>
+                </div>
+                <div class="range-row"><span>大小</span><input id="pomoFontSizeRange" type="range" min="36" max="80" step="1"><span class="range-value" id="pomoFontSizeValue">52px</span></div>
+                <div class="range-row"><span>粗细</span><input id="pomoFontWeightRange" type="range" min="200" max="800" step="50"><span class="range-value" id="pomoFontWeightValue">400</span></div>
+                <div class="font-preview" id="fontPreview">12:34</div>
+                <label class="switch-row" style="margin-top:12px;"><input type="checkbox" id="hideAllTextToggle"> 隐藏界面文字（保留必要图标）</label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ================================================================
+// 数据
+// ================================================================
+const state = {
+  currentView: 'timer',
+  timer: {
+    running: false, elapsed: 0, timerId: null,
+    mode: 'focus', activity: '写代码',
+    status: 'idle',
+  },
+  pomodoro: {
+    running: false,
+    remaining: 25 * 60, total: 25 * 60, timerId: null,
+    stage: 'focus',
+    activity: '写代码',
+    cycle: 1,
+    status: 'idle',
+    autoStartTimer: null,
+  },
+  presets: [
+    {
+      name: '经典番茄',
+      focus: 25, shortRest: 5, longRest: 15, cycle: 4,
+      focusEvent: '写代码', shortRestEvent: '喝水', longRestEvent: '午休',
+      endSound: 'bell',
+      autoFocus: false, autoRest: true, soundLoop: false,
+    },
+    {
+      name: '深度工作',
+      focus: 50, shortRest: 10, longRest: 20, cycle: 3,
+      focusEvent: '写代码', shortRestEvent: '散步', longRestEvent: '午休',
+      endSound: 'chime',
+      autoFocus: false, autoRest: false, soundLoop: false,
+    },
+  ],
+  activePresetIndex: 0,
+  activities: ['写代码', '阅读', '写作', '学习', '游戏', '散步', '喝水', '听音乐', '午休'],
+  history: [],
+  filter: { event: '', type: '', dateRange: null },
+  selectedIds: new Set(),
+  
+  visual: {
+    mode: 'text',
+    hideNumber: false,
+    graphicSize: 240, graphicThickness: 12,
+    pomoFontFamily: '-apple-system, "PingFang SC", "Microsoft YaHei", sans-serif',
+    pomoFontSize: 52, pomoFontWeight: 400,
+    hideAllText: false,
+    darkMode: false,
+    followSystem: false,
+    theme: 'A',
+    customThemes: [], customThemeIndex: 0, savedPresets: [],
+    fontFamily: '-apple-system, "PingFang SC", "Microsoft YaHei", sans-serif',
+    fontSize: 15,
+    fontWeight: 500
+  }
+};
+
+const colorThemes = {
+  A: {
+    light:{work:'#e53e3e',shortBreak:'#38a169',longBreak:'#3182ce',pause:'#718096',bg:'#f5f5f7',surface:'#fff',window:'#fafafa',text:'#1d1d1f'},
+    dark:{work:'#c53030',shortBreak:'#38a169',longBreak:'#3182ce',pause:'#4a5568',bg:'#1a202c',surface:'#232b3b',window:'#202938',text:'#f7fafc'}
+  },
+  B: {
+    light:{work:'#c5554e',shortBreak:'#589e72',longBreak:'#5486b4',pause:'#888e96',bg:'#f5f5f7',surface:'#fff',window:'#fafafa',text:'#1d1d1f'},
+    dark:{work:'#9b443e',shortBreak:'#487c5c',longBreak:'#446b8f',pause:'#575c64',bg:'#1a202c',surface:'#232b3b',window:'#202938',text:'#f7fafc'}
+  },
+  E: {
+    light:{work:'#b85450',shortBreak:'#61a880',longBreak:'#5c87b2',pause:'#787878',bg:'#f5f5f7',surface:'#fff',window:'#fafafa',text:'#1d1d1f'},
+    dark:{work:'#944340',shortBreak:'#4e8867',longBreak:'#4a6e91',pause:'#5c5c5c',bg:'#1a202c',surface:'#232b3b',window:'#202938',text:'#f7fafc'}
+  }
+};
+
+// ================================================================
+// 工具
+// ================================================================
+const $ = id => document.getElementById(id);
+function pad(n) { return n.toString().padStart(2, '0'); }
+function fmtTime(sec) {
+  const m = Math.floor(sec / 60).toString().padStart(2, '0');
+  const s = (sec % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
+function fmtDuration(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return s > 0 ? `${m}分${s}秒` : `${m}分`;
+}
+function nowStr() {
+  const d = new Date();
+  return `${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function nowDateStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function showToast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), 2200);
+}
+function getActivePreset() { return state.presets[state.activePresetIndex]; }
+function typeGroup(t) { return t === 'focus' ? 'focus' : 'rest'; }
+function typeName(t) {
+  if (t === 'focus') return '专注';
+  if (t === 'shortRest') return '短休息';
+  if (t === 'longRest') return '长休息';
+  return '休息';
+}
+
+function updateRing(elementId, percent, color) {
+  const circle = $(elementId);
+  if (!circle) return;
+  const radius = circle.r.baseVal.value;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (percent / 100) * circumference;
+  circle.style.strokeDasharray = `${circumference} ${circumference}`;
+  circle.style.strokeDashoffset = offset;
+  circle.style.stroke = color;
+}
+
+function updateBar(elementId, percent, color) {
+  const el = $(elementId);
+  if (!el) return;
+  el.style.width = `${percent}%`;
+  el.style.background = color;
+}
+
+function getEffectiveDark() {
+  return state.visual.followSystem
+    ? window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+    : state.visual.darkMode;
+}
+function getThemeColors() {
+  if (state.visual.theme === 'custom') return state.visual.customThemes[state.visual.customThemeIndex] || colorThemes.A.light;
+  if (state.visual.theme === 'saved') return state.visual.savedPresets[state.visual.savedPresetIndex] || colorThemes.A.light;
+  const theme = colorThemes[state.visual.theme] || colorThemes.A;
+  return theme[getEffectiveDark() ? 'dark' : 'light'];
+}
+function getStageColor(stage) {
+  const c = getThemeColors();
+  return stage === 'focus' ? c.work : stage === 'shortRest' ? c.shortBreak : c.longBreak;
+}
+function getPauseColor() { return getThemeColors().pause; }
+
+function applyTheme() {
+  const c = getThemeColors();
+  const root = document.documentElement;
+  root.style.setProperty('--focus', c.work);
+  root.style.setProperty('--short', c.shortBreak);
+  root.style.setProperty('--long', c.longBreak);
+  root.style.setProperty('--pause', c.pause);
+  root.style.setProperty('--bg', c.bg || '#f5f5f7');
+  root.style.setProperty('--surface', c.surface || '#fff');
+  root.style.setProperty('--window', c.window || '#fafafa');
+  root.style.setProperty('--text', c.text || '#1d1d1f');
+  document.body.classList.toggle('dark', getEffectiveDark());
+  document.body.classList.toggle('hide-all-text', state.visual.hideAllText);
+  document.documentElement.style.setProperty('--pomo-font-family', state.visual.pomoFontFamily);
+  document.documentElement.style.setProperty('--pomo-font-size', `${state.visual.pomoFontSize}px`);
+  document.documentElement.style.setProperty('--pomo-font-weight', state.visual.pomoFontWeight);
+  renderThemeControls();
+  renderPomodoro();
+  renderTimerView();
+}
+
+function renderThemeControls() {
+  const grid = $('themeGrid'); if (!grid) return;
+  const builtins = ['A','B','E'].map(k => { 
+    const c = colorThemes[k][getEffectiveDark() ? 'dark' : 'light']; 
+    return `<div class="theme-card ${state.visual.theme===k?'active':''}" data-theme="${k}">
+      <div class="theme-name">预设颜色${k==='A'?'1':k==='B'?'2':'3'}</div>
+      <div class="swatches"><span style="background:${c.work}"></span><span style="background:${c.shortBreak}"></span><span style="background:${c.longBreak}"></span><span style="background:${c.pause}"></span><span style="background:${c.bg}"></span><span style="background:${c.surface}"></span><span style="background:${c.window}"></span></div>
+    </div>`; 
+  }).join('');
+  grid.innerHTML=builtins;
+  grid.querySelectorAll('[data-theme]').forEach(el=>el.onclick=()=>{state.visual.theme=el.dataset.theme;applyTheme();saveVisualState();});
+
+  const savedGrid=$('savedThemeGrid');
+  if(savedGrid){
+    savedGrid.innerHTML=state.visual.savedPresets.length?state.visual.savedPresets.map((t,i)=>`<div class="preset-card-wrap">
+      <div class="theme-card ${state.visual.theme==='saved'&&state.visual.savedPresetIndex===i?'active':''}" data-saved-theme="${i}">
+        <div class="theme-name">${t.name||'已保存预设'}</div>
+        <div class="swatches"><span style="background:${t.work}"></span><span style="background:${t.shortBreak}"></span><span style="background:${t.longBreak}"></span><span style="background:${t.pause}"></span><span style="background:${t.bg}"></span><span style="background:${t.surface}"></span><span style="background:${t.window}"></span></div>
+        <div class="theme-color-picker">
+          <div><input type="color" value="${t.work}" data-saved-color="work" data-saved-index="${i}" title="专注色"><div class="picker-label">专注</div></div>
+          <div><input type="color" value="${t.shortBreak}" data-saved-color="shortBreak" data-saved-index="${i}" title="短休色"><div class="picker-label">短休</div></div>
+          <div><input type="color" value="${t.longBreak}" data-saved-color="longBreak" data-saved-index="${i}" title="长休色"><div class="picker-label">长休</div></div>
+          <div><input type="color" value="${t.pause}" data-saved-color="pause" data-saved-index="${i}" title="暂停色"><div class="picker-label">暂停</div></div>
+          <div><input type="color" value="${t.bg}" data-saved-color="bg" data-saved-index="${i}" title="背景色"><div class="picker-label">背景</div></div>
+          <div><input type="color" value="${t.surface}" data-saved-color="surface" data-saved-index="${i}" title="卡片色"><div class="picker-label">卡片</div></div>
+          <div><input type="color" value="${t.window}" data-saved-color="window" data-saved-index="${i}" title="窗口色"><div class="picker-label">窗口</div></div>
+        </div>
+      </div>
+      <button class="preset-delete" type="button" data-delete-saved="${i}" title="删除预设">✕</button>
+    </div>`).join(''):`<div class="color-note">还没有保存的预设颜色</div>`;
+    savedGrid.querySelectorAll('[data-saved-theme]').forEach(el=>el.onclick=()=>{state.visual.savedPresetIndex=+el.dataset.savedTheme;state.visual.theme='saved';applyTheme();saveVisualState();});
+    savedGrid.querySelectorAll('[data-delete-saved]').forEach(el=>el.onclick=e=>{
+      e.stopPropagation();
+      const i=+el.dataset.deleteSaved;
+      state.visual.savedPresets.splice(i,1);
+      if(!state.visual.savedPresets.length){
+        state.visual.savedPresetIndex=0;
+        state.visual.theme='A';
+      } else if(state.visual.savedPresetIndex>=state.visual.savedPresets.length){
+        state.visual.savedPresetIndex=state.visual.savedPresets.length-1;
+      }
+      renderThemeControls();
+      applyTheme();
+      saveVisualState();
+      showToast('已删除这个预设颜色');
+    });
+    savedGrid.querySelectorAll('[data-saved-color]').forEach(el => {
+      el.oninput = (e) => {
+        e.stopPropagation();
+        const i = +el.dataset.savedIndex;
+        const field = el.dataset.savedColor;
+        state.visual.savedPresets[i][field] = el.value;
+        if (state.visual.theme === 'saved' && state.visual.savedPresetIndex === i) {
+          applyTheme();
+        }
+        saveVisualState();
+      };
+      el.onclick = (e) => e.stopPropagation();
+    });
+  }
+
+  const list=$('customThemeList');
+  if(list){
+    list.innerHTML=state.visual.customThemes.length?state.visual.customThemes.map((t,i)=>`<div class="custom-theme-row">
+      <input class="custom-theme-name" type="text" value="${t.name||''}" data-theme-name="${i}" placeholder="颜色方案名称">
+      <div class="custom-theme-colors">
+        <label class="custom-color-item">专注<input type="color" value="${t.work||'#e53e3e'}" data-theme-field="work" data-theme-index="${i}"></label>
+        <label class="custom-color-item">短休<input type="color" value="${t.shortBreak||'#38a169'}" data-theme-field="shortBreak" data-theme-index="${i}"></label>
+        <label class="custom-color-item">长休<input type="color" value="${t.longBreak||'#3182ce'}" data-theme-field="longBreak" data-theme-index="${i}"></label>
+        <label class="custom-color-item">暂停<input type="color" value="${t.pause||'#718096'}" data-theme-field="pause" data-theme-index="${i}"></label>
+        <label class="custom-color-item">背景<input type="color" value="${t.bg||'#f5f5f7'}" data-theme-field="bg" data-theme-index="${i}"></label>
+        <label class="custom-color-item">卡片<input type="color" value="${t.surface||'#ffffff'}" data-theme-field="surface" data-theme-index="${i}"></label>
+        <label class="custom-color-item">窗口<input type="color" value="${t.window||'#fafafa'}" data-theme-field="window" data-theme-index="${i}"></label>
+      </div>
+      <div class="custom-theme-actions"><button class="use-btn" type="button" data-use-theme="${i}">使用此颜色</button><button class="delete-btn" type="button" data-remove-theme="${i}">删除</button></div>
+    </div>`).join(''):`<div class="color-note">点击“＋ 新建”创建自己的颜色方案</div>`;
+    list.querySelectorAll('[data-theme-field]').forEach(el=>el.oninput=()=>{const i=+el.dataset.themeIndex;state.visual.customThemes[i][el.dataset.themeField]=el.value;state.visual.customThemeIndex=i;state.visual.theme='custom';applyTheme();saveVisualState();});
+    list.querySelectorAll('[data-theme-name]').forEach(el=>el.oninput=()=>{state.visual.customThemes[+el.dataset.themeName].name=el.value;saveVisualState();});
+    list.querySelectorAll('[data-use-theme]').forEach(el=>el.onclick=e=>{e.stopPropagation();state.visual.customThemeIndex=+el.dataset.useTheme;state.visual.theme='custom';applyTheme();saveVisualState();showToast('已应用自定义颜色');});
+    list.querySelectorAll('[data-remove-theme]').forEach(el=>el.onclick=e=>{e.stopPropagation();const i=+el.dataset.removeTheme;state.visual.customThemes.splice(i,1);if(!state.visual.customThemes.length){state.visual.customThemeIndex=0;state.visual.theme='A';}else state.visual.customThemeIndex=Math.min(state.visual.customThemeIndex,state.visual.customThemes.length-1);renderThemeControls();applyTheme();saveVisualState();showToast('已删除自定义颜色');});
+  }
+  const dm=$('darkModeToggle'),fsys=$('followSystemToggle'),ha=$('hideAllTextToggle');if(dm)dm.checked=state.visual.darkMode;if(fsys)fsys.checked=state.visual.followSystem;if(ha)ha.checked=state.visual.hideAllText;
+  const hn=$('hideNumberToggle'),pff=$('pomoFontFamilySelect'),pfz=$('pomoFontSizeRange'),pfw=$('pomoFontWeightRange');if(hn)hn.checked=!!state.visual.hideNumber;if(pff)pff.value=state.visual.pomoFontFamily;if(pfz)pfz.value=String(state.visual.pomoFontSize||52);if(pfw)pfw.value=String(state.visual.pomoFontWeight||400);
+  [['pomoFontSizeValue',state.visual.pomoFontSize||52,'px'],['pomoFontWeightValue',state.visual.pomoFontWeight||400,'']].forEach(([id,v,u])=>{const e=$(id);if(e)e.textContent=v+u;});
+}
+
+function saveVisualState(){ try{ localStorage.setItem('pomodoro_visual_v2', JSON.stringify(state.visual)); }catch(e){} }
+function loadVisualState(){ 
+  try{ 
+    const x=JSON.parse(localStorage.getItem('pomodoro_visual_v2')||'null'); 
+    if(x) state.visual=Object.assign(state.visual,x); 
+    if(!['simple','bar','ring'].includes(state.visual.mode)) state.visual.mode='simple'; 
+    state.visual.savedPresets = []; 
+    state.visual.customThemes = []; 
+    state.visual.theme = 'A'; 
+    state.visual.savedPresetIndex = 0; 
+    state.visual.customThemeIndex = 0; 
+    delete state.visual.uiFontSize; 
+    delete state.visual.uiFontWeight; 
+  }catch(e){}
+}
+
+function applyVisualMode() {
+  const visual = $('pomoVisual');
+  if (!visual) return;
+
+  const mode = state.visual.mode === 'text' ? 'simple' : state.visual.mode;
+  state.visual.mode = ['simple','bar','ring'].includes(mode) ? mode : 'simple';
+
+  visual.className = `timer-visual ${state.visual.mode}`;
+  visual.removeAttribute('style');
+
+  document.querySelectorAll('.visual-mode-card').forEach(el => {
+    el.classList.toggle('active', el.dataset.mode === state.visual.mode);
+  });
+
+  const c = state.pomodoro;
+  const thick = 16;
+
+  if (state.visual.mode === 'ring') {
+    visual.innerHTML =
+      `<svg class="timer-ring" viewBox="0 0 220 220" style="width:240px;height:240px">
+        <circle class="bg" cx="110" cy="110" r="100"></circle>
+        <circle class="progress" id="pomoRingProgress" cx="110" cy="110" r="100"></circle>
+      </svg>` +
+      `${state.visual.hideNumber ? '' :
+        `<div class="time-display ${c.stage}" id="pomoDisplay">${fmtTime(c.remaining)}</div>`}`;
+
+    visual.style.width = '240px';
+    visual.style.height = '240px';
+    visual.style.margin = '0 auto 8px';
+    visual.style.setProperty('--graphic-thickness', `${thick}px`);
+  } else if (state.visual.mode === 'bar') {
+    visual.innerHTML =
+      `${state.visual.hideNumber ? '' :
+        `<div class="time-display ${c.stage}" id="pomoDisplay">${fmtTime(c.remaining)}</div>`}
+       <div class="timer-bar-wrap" style="height:${thick}px;max-width:300px">
+         <div class="timer-bar-progress" id="pomoBarProgress"></div>
+       </div>`;
+
+    visual.style.width = '100%';
+    visual.style.maxWidth = '300px';
+    visual.style.height = '78px';
+    visual.style.margin = '0 auto 8px';
+    visual.style.justifyContent = 'center';
+    visual.style.gap = '5px';
+  } else {
+    visual.innerHTML =
+      `<div class="time-display ${c.stage}" id="pomoDisplay">${fmtTime(c.remaining)}</div>`;
+
+    visual.style.width = '100%';
+    visual.style.height = '78px';
+    visual.style.margin = '0 auto 8px';
+    visual.style.justifyContent = 'center';
+  }
+
+  renderPomodoro();
+}
+
+// 导航
+document.querySelectorAll('.top-nav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const view = btn.dataset.view;
+    state.currentView = view;
+    document.querySelectorAll('.top-nav button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    $(`view-${view}`).classList.add('active');
+
+    if (view === 'history') renderHistory();
+    if (view === 'settings') { 
+      renderSettingsPreset(); 
+      renderActivities(); 
+      applyVisualMode();
+    }
+    if (view === 'pomodoro') { 
+      renderPomodoro(); 
+      renderPomoPresetBody(); 
+    }
+    updateStats();
+  });
+});
+
+document.querySelectorAll('[data-toggle]').forEach(el => {
+  el.addEventListener('click', () => {
+    const target = $(el.dataset.toggle);
+    if (target) {
+      target.classList.toggle('open');
+      const arrow = el.querySelector('.arrow');
+      if (arrow) {
+        arrow.style.transform = target.classList.contains('open') ? 'rotate(180deg)' : 'rotate(0deg)';
+      }
+    }
+  });
+});
+
+function renderActivityOptions() {
+  const tSel = $('timerActivitySelect');
+  tSel.innerHTML = state.activities.map(a =>
+    `<option value="${a}">${a}</option>`
+  ).join('');
+  if (state.activities.includes(state.timer.activity)) {
+    tSel.value = state.timer.activity;
+  } else if (state.activities.length > 0) {
+    state.timer.activity = state.activities[0];
+    tSel.value = state.timer.activity;
+  }
+
+  const pSel = $('pomoActivitySelect');
+  pSel.innerHTML = state.activities.map(a =>
+    `<option value="${a}">${a}</option>`
+  ).join('');
+  if (state.activities.includes(state.pomodoro.activity)) {
+    pSel.value = state.pomodoro.activity;
+  } else if (state.activities.length > 0) {
+    state.pomodoro.activity = state.activities[0];
+    pSel.value = state.pomodoro.activity;
+  }
+}
+
+document.querySelectorAll('[data-custom]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const wrap = $(btn.dataset.custom);
+    const select = $(btn.dataset.select);
+    const input = $(btn.dataset.input);
+    const isPomo = wrap.id.startsWith('pomo');
+    
+    if (!wrap.classList.contains('is-input')) {
+      wrap.classList.add('is-input');
+      const cur = isPomo ? state.pomodoro.activity : state.timer.activity;
+      input.value = cur;
+      input.focus();
+      input.select();
+      
+      const confirm = () => {
+        const val = input.value.trim();
+        if (val) {
+          if (!state.activities.includes(val)) {
+            state.activities.push(val);
+            showToast(`已添加活动「${val}」`);
+          }
+          if (isPomo) state.pomodoro.activity = val;
+          else state.timer.activity = val;
+        }
+        wrap.classList.remove('is-input');
+        renderActivityOptions();
+        renderActivities();
+        renderPomoPresetBody();
+        renderSettingsPreset();
+      };
+      
+      const cancel = () => {
+        wrap.classList.remove('is-input');
+        renderActivityOptions();
+      };
+      
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); confirm(); }
+        if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+      };
+      input.onblur = () => { if (wrap.classList.contains('is-input')) confirm(); };
+    }
+  });
+});
+
+function renderTimerView() {
+  const t = state.timer;
+  const d = $('timerDisplay');
+  d.textContent = fmtTime(t.elapsed);
+  d.className = 'time-display ' + t.mode;
+  d.style.color = t.mode === 'focus' ? getThemeColors().work : getThemeColors().shortBreak;
+
+  const colors = getThemeColors();
+  const activeColor = t.mode === 'focus' ? colors.work : colors.shortBreak;
+  const startBtn = $('timerStartBtn');
+  startBtn.className = 'btn btn-primary';
+  startBtn.style.background = t.status === 'paused' ? colors.pause : activeColor;
+  if (t.status === 'idle') {
+    startBtn.querySelector('.btn-icon').textContent = '▶';
+    startBtn.querySelector('.btn-label').textContent = '开始';
+  } else if (t.status === 'running') {
+    startBtn.querySelector('.btn-icon').textContent = '⏸';
+    startBtn.querySelector('.btn-label').textContent = '暂停';
+  } else {
+    startBtn.querySelector('.btn-icon').textContent = '▶';
+    startBtn.querySelector('.btn-label').textContent = '继续';
+  }
+  startBtn.disabled = false;
+
+  const skipBtn = $('timerSkipBtn');
+  skipBtn.querySelector('.btn-icon').textContent = t.status === 'idle' ? '⏭' : '⏹';
+  skipBtn.querySelector('.btn-label').textContent = t.status === 'idle' ? '跳过' : '结束';
+  skipBtn.style.background = t.status === 'idle' ? '' : colors.pause;
+  skipBtn.disabled = false;
+
+  document.querySelectorAll('#view-timer .mode-tabs button').forEach(b => {
+    const modeColor = b.dataset.mode === 'focus' ? colors.work : colors.shortBreak;
+    b.style.color = b.classList.contains('active') ? modeColor : '';
+    b.style.borderColor = b.classList.contains('active') ? modeColor : '';
+  });
+  
+  const resetBtn = $('timerResetBtn');
+  resetBtn.disabled = t.status === 'idle' && t.elapsed === 0;
+  resetBtn.style.opacity = (t.status === 'idle' && t.elapsed === 0) ? '0.5' : '1';
+
+  updateStats();
+}
+
+function timerTick() {
+  state.timer.elapsed++;
+  renderTimerView();
+}
+
+function timerStart() {
+  const t = state.timer;
+  if (t.status === 'running') {
+    clearInterval(t.timerId);
+    t.status = 'paused';
+    renderTimerView();
+    return;
+  }
+  t.status = 'running';
+  t.timerId = setInterval(timerTick, 1000);
+  renderTimerView();
+}
+
+function timerEndOrSkip() {
+  const t = state.timer;
+  if (t.status === 'idle') {
+    t.elapsed = 0;
+    renderTimerView();
+    showToast('已跳过');
+  } else {
+    clearInterval(t.timerId);
+    if (t.elapsed > 0) {
+      state.history.unshift({
+        id: Date.now() + Math.random(),
+        name: t.activity,
+        type: t.mode,
+        seconds: t.elapsed,
+        date: nowDateStr(),
+        time: nowStr(),
+        completed: false,
+        source: 'timer',
+      });
+      showToast(`已保存：${t.activity} · ${fmtDuration(t.elapsed)}`);
+      renderHistory();
+    }
+    t.elapsed = 0;
+    t.status = 'idle';
+    renderTimerView();
+  }
+}
+
+function timerReset() {
+  const t = state.timer;
+  clearInterval(t.timerId);
+  t.elapsed = 0;
+  t.status = 'idle';
+  renderTimerView();
+}
+
+document.querySelectorAll('#view-timer .mode-tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (state.timer.status !== 'idle') { showToast('请先结束或重置当前计时'); return; }
+    state.timer.mode = btn.dataset.mode;
+    document.querySelectorAll('#view-timer .mode-tabs button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderTimerView();
+  });
+});
+
+$('timerStartBtn').addEventListener('click', timerStart);
+$('timerSkipBtn').addEventListener('click', timerEndOrSkip);
+$('timerResetBtn').addEventListener('click', timerReset);
+$('timerActivitySelect').addEventListener('change', e => state.timer.activity = e.target.value);
+
+function applyPomodoroPreset() {
+  const p = getActivePreset();
+  const stage = state.pomodoro.stage;
+  let sec;
+  if (stage === 'focus') sec = p.focus * 60;
+  else if (stage === 'shortRest') sec = p.shortRest * 60;
+  else sec = p.longRest * 60;
+  state.pomodoro.total = sec;
+  state.pomodoro.remaining = sec;
+  state.pomodoro.status = 'idle';
+
+  let mapped;
+  if (stage === 'focus') mapped = p.focusEvent;
+  else if (stage === 'shortRest') mapped = p.shortRestEvent;
+  else mapped = p.longRestEvent;
+  if (mapped) state.pomodoro.activity = mapped;
+  renderActivityOptions();
+  renderPomodoro();
+}
+
+function renderPomodoro() {
+  const c = state.pomodoro;
+  const mode = state.visual.mode === 'text' ? 'simple' : state.visual.mode;
+  const d = $('pomoDisplay');
+  const percent = c.total > 0 ? (c.remaining / c.total) * 100 : 0;
+  const color = getStageColor(c.stage);
+
+  if (d) {
+    d.textContent = fmtTime(c.remaining);
+    d.className = 'time-display ' + c.stage;
+    d.style.color = color;
+    d.style.display = (mode !== 'simple' && state.visual.hideNumber) ? 'none' : '';
+  }
+  if (mode === 'ring') updateRing('pomoRingProgress', percent, color);
+  if (mode === 'bar') updateBar('pomoBarProgress', percent, color);
+
+  const startBtn = $('pomoStartBtn');
+  startBtn.className = 'btn btn-primary';
+  
+  const startColor = getStageColor(c.stage);
+  startBtn.style.background = c.status === 'paused' ? getPauseColor() : startColor;
+  if (c.status === 'idle') {
+    startBtn.querySelector('.btn-icon').textContent = '▶';
+    startBtn.querySelector('.btn-label').textContent = '开始';
+    startBtn.disabled = false;
+  } else if (c.status === 'running') {
+    startBtn.querySelector('.btn-icon').textContent = '⏸';
+    startBtn.querySelector('.btn-label').textContent = '暂停';
+    startBtn.disabled = false;
+  } else if (c.status === 'paused') {
+    startBtn.querySelector('.btn-icon').textContent = '▶';
+    startBtn.querySelector('.btn-label').textContent = '继续';
+    startBtn.disabled = false;
+  }
+
+  const skipBtn = $('pomoSkipBtn');
+  skipBtn.querySelector('.btn-icon').textContent = c.status === 'idle' ? '⏭' : '⏹';
+  skipBtn.querySelector('.btn-label').textContent = c.status === 'idle' ? '跳过' : '结束';
+  skipBtn.disabled = false;
+  
+  const resetBtn = $('pomoResetBtn');
+  resetBtn.disabled = c.status === 'idle' && c.remaining === c.total;
+  resetBtn.style.opacity = (c.status === 'idle' && c.remaining === c.total) ? '0.5' : '1';
+
+  document.querySelectorAll('#pomoModeTabs button').forEach(b => {
+    b.classList.remove('active');
+    if (b.dataset.stage === c.stage) {
+      b.classList.add('active');
+    }
+  });
+
+  updateStats();
+}
+
+function pomoTick() {
+  const c = state.pomodoro;
+  if (c.remaining <= 0) { pomoFinish(true); return; }
+  c.remaining--;
+  renderPomodoro();
+}
+
+function pomoStart() {
+  const c = state.pomodoro;
+  if (c.autoStartTimer) {
+    clearTimeout(c.autoStartTimer);
+    c.autoStartTimer = null;
+  }
+  
+  if (c.status === 'running') {
+    clearInterval(c.timerId);
+    c.status = 'paused';
+    renderPomodoro();
+    return;
+  }
+  c.status = 'running';
+  c.timerId = setInterval(pomoTick, 1000);
+  renderPomodoro();
+}
+
+function pomoEndOrSkip() {
+  const c = state.pomodoro;
+  if (c.autoStartTimer) {
+    clearTimeout(c.autoStartTimer);
+    c.autoStartTimer = null;
+  }
+  
+  if (c.status === 'idle') {
+    clearInterval(c.timerId);
+    c.status = 'idle';
+    
+    const p = getActivePreset();
+    if (c.stage === 'focus') {
+      c.stage = 'shortRest';
+    } else if (c.stage === 'shortRest') {
+      c.stage = 'focus';
+      c.cycle++;
+      if (c.cycle > p.cycle) {
+        c.stage = 'longRest';
+        c.cycle = 1;
+      }
+    } else if (c.stage === 'longRest') {
+      c.stage = 'focus';
+      c.cycle = 1;
+    }
+    
+    let mapped;
+    if (c.stage === 'focus') mapped = p.focusEvent;
+    else if (c.stage === 'shortRest') mapped = p.shortRestEvent;
+    else mapped = p.longRestEvent;
+    if (mapped) c.activity = mapped;
+    
+    applyPomodoroPreset();
+    renderPomodoro();
+    showToast('已跳过当前阶段');
+  } else {
+    pomoFinish(false);
+  }
+}
+
+function pomoFinish(completed) {
+  const c = state.pomodoro;
+  clearInterval(c.timerId);
+  
+  if (c.autoStartTimer) {
+    clearTimeout(c.autoStartTimer);
+    c.autoStartTimer = null;
+  }
+  
+  const elapsed = c.total - c.remaining;
+  if (elapsed > 0) {
+    state.history.unshift({
+      id: Date.now() + Math.random(),
+      name: c.activity,
+      type: c.stage,
+      seconds: elapsed,
+      date: nowDateStr(),
+      time: nowStr(),
+      completed: completed,
+      source: 'pomodoro',
+    });
+    renderHistory();
+    if (completed) showToast(`完成！${c.activity} · ${fmtDuration(elapsed)}`);
+    else showToast(`已结束并保存：${c.activity} · ${fmtDuration(elapsed)}`);
+  }
+
+  if (completed) {
+    const p = getActivePreset();
+    if (c.stage === 'focus') {
+      c.stage = 'shortRest';
+    } else if (c.stage === 'shortRest') {
+      c.stage = 'focus';
+      c.cycle++;
+      if (c.cycle > p.cycle) {
+        c.stage = 'longRest';
+        c.cycle = 1;
+      }
+    } else if (c.stage === 'longRest') {
+      c.stage = 'focus';
+      c.cycle = 1;
+    }
+    
+    let mapped;
+    if (c.stage === 'focus') mapped = p.focusEvent;
+    else if (c.stage === 'shortRest') mapped = p.shortRestEvent;
+    else mapped = p.longRestEvent;
+    if (mapped) c.activity = mapped;
+  }
+  
+  applyPomodoroPreset();
+  renderPomodoro();
+  
+  if (completed) {
+    const p = getActivePreset();
+    const nextStage = c.stage;
+    let shouldAutoStart = false;
+    if (nextStage === 'focus' && p.autoFocus) shouldAutoStart = true;
+    if ((nextStage === 'shortRest' || nextStage === 'longRest') && p.autoRest) shouldAutoStart = true;
+    
+    if (shouldAutoStart) {
+      c.autoStartTimer = setTimeout(() => {
+        if (c.status === 'idle') {
+          pomoStart();
+          showToast('自动开始下一个阶段');
+        }
+        c.autoStartTimer = null;
+      }, 500);
+    }
+  }
+}
+
+function pomoReset() {
+  const c = state.pomodoro;
+  clearInterval(c.timerId);
+  if (c.autoStartTimer) {
+    clearTimeout(c.autoStartTimer);
+    c.autoStartTimer = null;
+  }
+  c.status = 'idle';
+  applyPomodoroPreset();
+  renderPomodoro();
+}
+
+document.querySelectorAll('#pomoModeTabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (state.pomodoro.status !== 'idle') { showToast('请先结束或重置当前计时'); return; }
+    state.pomodoro.stage = btn.dataset.stage;
+    applyPomodoroPreset();
+    renderPomodoro();
+  });
+});
+
+$('pomoStartBtn').addEventListener('click', pomoStart);
+$('pomoSkipBtn').addEventListener('click', pomoEndOrSkip);
+$('pomoResetBtn').addEventListener('click', pomoReset);
+$('pomoActivitySelect').addEventListener('change', e => state.pomodoro.activity = e.target.value);
+
+function updateStats() {
+  const today = nowDateStr();
+  const todayHistory = state.history.filter(h => h.date === today);
+  const focusMin = Math.round(todayHistory.filter(h => typeGroup(h.type) === 'focus').reduce((s, h) => s + h.seconds, 0) / 60);
+  const restMin = Math.round(todayHistory.filter(h => typeGroup(h.type) === 'rest').reduce((s, h) => s + h.seconds, 0) / 60);
+  const p = getActivePreset();
+
+  $('timerStatFocus').textContent = `${focusMin}`;
+  $('timerStatRest').textContent = `${restMin}`;
+
+  $('pomoStatFocus').textContent = `${focusMin}`;
+  $('pomoStatRest').textContent = `${restMin}`;
+  $('pomoStatCycle').textContent = `${state.pomodoro.cycle} / ${p.cycle}`;
+}
+
+function renderHistoryFilters() {
+  const sel = $('filterEvent');
+  const cur = sel.value;
+  sel.innerHTML = `<option value="">全部事件</option>` +
+    state.activities.map(a => `<option value="${a}" ${a === cur ? 'selected' : ''}>${a}</option>`).join('');
+}
+
+function renderHistory() {
+  renderHistoryFilters();
+
+  let list = [...state.history];
+  const f = state.filter;
+  if (f.type) list = list.filter(h => typeGroup(h.type) === f.type);
+  if (f.event) list = list.filter(h => h.name === f.event);
+  if (f.dateRange) list = list.filter(h => h.date >= f.dateRange.start && h.date <= f.dateRange.end);
+
+  const focusTotal = list.filter(h => typeGroup(h.type) === 'focus').reduce((s, h) => s + h.seconds, 0);
+  const restTotal = list.filter(h => typeGroup(h.type) === 'rest').reduce((s, h) => s + h.seconds, 0);
+  $('historyStats').innerHTML = `
+    <div class="stat">
+      <div class="stat-value focus">${Math.round(focusTotal/60)}</div>
+      <div class="stat-label">专注分钟</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value rest">${Math.round(restTotal/60)}</div>
+      <div class="stat-label">休息分钟</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">${list.length}</div>
+      <div class="stat-label">记录数</div>
+    </div>
+  `;
+
+  const listEl = $('historyList');
+  
+  if (list.length === 0) {
+    listEl.innerHTML = `<div class="history-empty">没有符合条件的记录</div>`;
+    $('selectAll').checked = false;
+    $('selectedCount').textContent = '已选 0 项';
+    state.selectedIds.clear();
+    return;
+  }
+
+  listEl.innerHTML = list.map(h => {
+    const selected = state.selectedIds.has(h.id);
+    const grp = typeGroup(h.type);
+    const icon = grp === 'focus' ? '🍅' : '☕';
+    return `
+      <div class="history-item ${selected ? 'selected' : ''}" data-id="${h.id}">
+        <input type="checkbox" ${selected ? 'checked' : ''} data-check="${h.id}">
+        <div class="history-dot ${grp}">${icon}</div>
+        <div class="history-info">
+          <div class="history-name">${h.name}</div>
+          <div class="history-meta">${typeName(h.type)} · ${h.date} ${h.time}${h.completed ? '' : ' · 提前结束'}${h.source === 'pomodoro' ? ' · 番茄钟' : ''}</div>
+        </div>
+        <div class="history-duration ${grp}">${fmtDuration(h.seconds)}</div>
+      </div>
+    `;
+  }).join('');
+
+  listEl.querySelectorAll('[data-check]').forEach(cb => {
+    cb.addEventListener('change', e => {
+      const id = parseFloat(e.target.dataset.check);
+      if (e.target.checked) state.selectedIds.add(id);
+      else state.selectedIds.delete(id);
+      renderHistory();
+    });
+  });
+
+  $('selectAll').checked = list.length > 0 && list.every(h => state.selectedIds.has(h.id));
+  $('selectedCount').textContent = `已选 ${state.selectedIds.size} 项`;
+}
+
+$('selectAll').addEventListener('change', e => {
+  let list = [...state.history];
+  const f = state.filter;
+  if (f.type) list = list.filter(h => typeGroup(h.type) === f.type);
+  if (f.event) list = list.filter(h => h.name === f.event);
+  if (f.dateRange) list = list.filter(h => h.date >= f.dateRange.start && h.date <= f.dateRange.end);
+  if (e.target.checked) list.forEach(h => state.selectedIds.add(h.id));
+  else list.forEach(h => state.selectedIds.delete(h.id));
+  renderHistory();
+});
+
+$('batchDeleteBtn').addEventListener('click', () => {
+  if (state.selectedIds.size === 0) { showToast('请先选择记录'); return; }
+  state.history = state.history.filter(h => !state.selectedIds.has(h.id));
+  state.selectedIds.clear();
+  renderHistory();
+  showToast('已删除选中记录');
+});
+
+$('filterType').addEventListener('change', e => { 
+  state.filter.type = e.target.value; 
+  state.selectedIds.clear();
+  renderHistory(); 
+});
+$('filterEvent').addEventListener('change', e => { 
+  state.filter.event = e.target.value; 
+  state.selectedIds.clear();
+  renderHistory(); 
+});
+
+const calendarState = { year: new Date().getFullYear(), month: new Date().getMonth(), start: null, end: null };
+function renderCalendar() {
+  const popup = $('calendarPopup');
+  const y = calendarState.year, m = calendarState.month;
+  const firstDay = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const daysInPrev = new Date(y, m, 0).getDate();
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
+  let html = `
+    <div class="calendar-header">
+      <button id="calPrev">‹</button>
+      <span>${y} 年 ${m+1} 月</span>
+      <button id="calNext">›</button>
+    </div>
+    <div class="calendar-grid">
+      ${['日','一','二','三','四','五','六'].map(d => `<div class="day-name">${d}</div>`).join('')}
+  `;
+  for (let i = firstDay - 1; i >= 0; i--) html += `<div class="day other-month">${daysInPrev - i}</div>`;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${y}-${pad(m+1)}-${pad(d)}`;
+    let cls = 'day';
+    if (dateStr === todayStr) cls += ' today';
+    if (dateStr === calendarState.start || dateStr === calendarState.end) cls += ' selected';
+    if (calendarState.start && calendarState.end && dateStr > calendarState.start && dateStr < calendarState.end) cls += ' selected';
+    html += `<div class="${cls}" data-date="${dateStr}">${d}</div>`;
+  }
+  const total = firstDay + daysInMonth;
+  const rem = (7 - total % 7) % 7;
+  for (let i = 1; i <= rem; i++) html += `<div class="day other-month">${i}</div>`;
+  html += `</div>
+    <div style="display:flex;gap:8px;margin-top:12px;font-size:12px;">
+      <button id="calClear" style="flex:1;padding:8px;border:1px solid #ddd;background:#fff;border-radius:8px;cursor:pointer;font-family:inherit;">清除</button>
+      <button id="calApply" style="flex:1;padding:8px;border:none;background:#2d8a5f;color:#fff;border-radius:8px;cursor:pointer;font-family:inherit;">应用</button>
+    </div>`;
+  popup.innerHTML = html;
+  popup.querySelector('#calPrev').addEventListener('click', e => { e.stopPropagation(); calendarState.month--; if (calendarState.month < 0) { calendarState.month = 11; calendarState.year--; } renderCalendar(); });
+  popup.querySelector('#calNext').addEventListener('click', e => { e.stopPropagation(); calendarState.month++; if (calendarState.month > 11) { calendarState.month = 0; calendarState.year++; } renderCalendar(); });
+  popup.querySelectorAll('.day[data-date]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      const d = el.dataset.date;
+      if (!calendarState.start || (calendarState.start && calendarState.end)) { calendarState.start = d; calendarState.end = null; }
+      else { if (d < calendarState.start) { calendarState.end = calendarState.start; calendarState.start = d; } else calendarState.end = d; }
+      renderCalendar();
+    });
+  });
+  popup.querySelector('#calClear').addEventListener('click', e => { e.stopPropagation(); calendarState.start = null; calendarState.end = null; renderCalendar(); });
+  popup.querySelector('#calApply').addEventListener('click', e => {
+    e.stopPropagation();
+    if (calendarState.start) {
+      state.filter.dateRange = { start: calendarState.start, end: calendarState.end || calendarState.start };
+      const text = state.filter.dateRange.start === state.filter.dateRange.end
+        ? state.filter.dateRange.start
+        : `${state.filter.dateRange.start} ~ ${state.filter.dateRange.end}`;
+      $('filterDateBtn').childNodes[0].nodeValue = `📅 ${text} `;
+      renderCalendar();
+    }
+    state.selectedIds.clear();
+    popup.classList.remove('show');
+    renderHistory();
+  });
+}
+
+$('filterDateBtn').addEventListener('click', e => {
+  e.stopPropagation();
+  const popup = $('calendarPopup');
+  popup.classList.toggle('show');
+  if (popup.classList.contains('show')) renderCalendar();
+});
+document.addEventListener('click', e => {
+  const popup = $('calendarPopup');
+  if (popup && popup.classList.contains('show') && !popup.contains(e.target) && e.target.id !== 'filterDateBtn') {
+    popup.classList.remove('show');
+  }
+});
+
+function buildPlanCardHTML(p, opts = {}) {
+  const showSelector = opts.showSelector === true;
+  const isPomoInline = opts.inline === true;
+  const presetOptions = state.presets.map((pp, i) =>
+    `<option value="${i}" ${i === state.activePresetIndex ? 'selected' : ''}>${pp.name}</option>`
+  ).join('');
+
+  const eventOptions = (cur) => state.activities.map(a =>
+    `<option value="${a}" ${a === cur ? 'selected' : ''}>${a}</option>`
+  ).join('');
+
+  return `
+    <div class="plan-card">
+      <div class="plan-head">
+        ${showSelector
+          ? `<select data-role="presetSelect">${presetOptions}</select>`
+          : `<input type="text" value="${p.name}" data-field="name" placeholder="方案名称">`
+        }
+        <button class="mini-btn primary" data-action="new" title="新建方案">＋</button>
+        ${!isPomoInline ? `<button class="mini-btn" data-action="save" title="保存">📕</button>` : ''}
+        ${!isPomoInline ? `<button class="mini-btn danger" data-action="delete" title="删除">🗑</button>` : ''}
+      </div>
+      <div class="plan-params">
+        <div class="plan-param">
+          <label>专注</label>
+          <select class="event-sel" data-field="focusEvent">${eventOptions(p.focusEvent)}</select>
+          <input class="num" type="number" value="${p.focus}" data-field="focus" min="1">
+          <span class="unit">分</span>
+        </div>
+        <div class="plan-param">
+          <label>短休</label>
+          <select class="event-sel" data-field="shortRestEvent">${eventOptions(p.shortRestEvent)}</select>
+          <input class="num" type="number" value="${p.shortRest}" data-field="shortRest" min="1">
+          <span class="unit">分</span>
+        </div>
+        <div class="plan-param">
+          <label>长休</label>
+          <select class="event-sel" data-field="longRestEvent">${eventOptions(p.longRestEvent)}</select>
+          <input class="num" type="number" value="${p.longRest}" data-field="longRest" min="1">
+          <span class="unit">分</span>
+        </div>
+        <div class="plan-param">
+          <label>长休前轮数</label>
+          <input class="num" type="number" value="${p.cycle}" data-field="cycle" min="1">
+          <span class="unit">轮</span>
+        </div>
+      </div>
+      <div class="plan-sound-row">
+        <label>提示音</label>
+        <select data-field="endSound">
+          <option value="bell" ${p.endSound === 'bell' ? 'selected' : ''}>🔔 铃声</option>
+          <option value="ding" ${p.endSound === 'ding' ? 'selected' : ''}>🔕 叮咚</option>
+          <option value="chime" ${p.endSound === 'chime' ? 'selected' : ''}>🎵 风铃</option>
+          <option value="custom" ${p.endSound === 'custom' ? 'selected' : ''}>📁 自定义</option>
+        </select>
+        <button class="upload-btn" data-action="upload">上传</button>
+      </div>
+      <div class="plan-switches">
+        <label class="switch"><input type="checkbox" ${p.autoFocus ? 'checked' : ''} data-field="autoFocus"> 自动开始专注</label>
+        <label class="switch"><input type="checkbox" ${p.autoRest ? 'checked' : ''} data-field="autoRest"> 自动开始休息</label>
+        <label class="switch"><input type="checkbox" ${p.soundLoop ? 'checked' : ''} data-field="soundLoop"> 提示音循环</label>
+      </div>
+    </div>
+  `;
+}
+
+function bindPlanCard(container, opts = {}) {
+  const p = getActivePreset();
+  container.querySelectorAll('[data-field]').forEach(el => {
+    const handler = e => {
+      const field = e.target.dataset.field;
+      const val = e.target.type === 'checkbox' ? e.target.checked
+        : (e.target.type === 'number' ? +e.target.value : e.target.value);
+      p[field] = val;
+      renderPomoPresetBody();
+      renderSettingsPreset();
+      if (!state.pomodoro.running && state.pomodoro.remaining === state.pomodoro.total) {
+        applyPomodoroPreset();
+        renderPomodoro();
+      } else if (field === 'focusEvent' || field === 'shortRestEvent' || field === 'longRestEvent') {
+        if (field === 'focusEvent' && state.pomodoro.stage === 'focus') {
+          state.pomodoro.activity = p.focusEvent;
+          renderActivityOptions(); renderPomodoro();
+        } else if (field === 'shortRestEvent' && state.pomodoro.stage === 'shortRest') {
+          state.pomodoro.activity = p.shortRestEvent;
+          renderActivityOptions(); renderPomodoro();
+        } else if (field === 'longRestEvent' && state.pomodoro.stage === 'longRest') {
+          state.pomodoro.activity = p.longRestEvent;
+          renderActivityOptions(); renderPomodoro();
+        }
+      }
+      updateStats();
+    };
+    el.addEventListener('input', handler);
+    el.addEventListener('change', handler);
+  });
+
+  const sel = container.querySelector('[data-role="presetSelect"]');
+  if (sel) {
+    sel.addEventListener('change', e => {
+      state.activePresetIndex = +e.target.value;
+      renderPomoPresetBody();
+      renderSettingsPreset();
+      applyPomodoroPreset();
+      renderPomodoro();
+    });
+  }
+
+  container.querySelectorAll('[data-action]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const action = btn.dataset.action;
+      if (action === 'new') {
+        state.presets.push({
+          name: '新方案', focus: 25, shortRest: 5, longRest: 15, cycle: 4,
+          focusEvent: '写代码', shortRestEvent: '喝水', longRestEvent: '午休',
+          endSound: 'bell',
+          autoFocus: false, autoRest: false, soundLoop: false,
+        });
+        state.activePresetIndex = state.presets.length - 1;
+        renderPomoPresetBody();
+        renderSettingsPreset();
+        showToast('已新建方案');
+      } else if (action === 'delete') {
+        if (state.presets.length <= 1) { showToast('至少保留一个方案'); return; }
+        state.presets.splice(state.activePresetIndex, 1);
+        if (state.activePresetIndex >= state.presets.length) state.activePresetIndex = 0;
+        renderPomoPresetBody();
+        renderSettingsPreset();
+        applyPomodoroPreset();
+        renderPomodoro();
+        showToast('已删除方案');
+      } else if (action === 'save') {
+        showToast(`已保存「${p.name}」`);
+      } else if (action === 'upload') {
+        showToast('上传提示音（原型演示）');
+      }
+    });
+  });
+}
+
+function renderPomoPresetBody() {
+  const p = getActivePreset();
+  $('pomoPresetBody').innerHTML = buildPlanCardHTML(p, { showSelector: true, inline: true });
+  bindPlanCard($('pomoPresetBody'), { showSelector: true, inline: true });
+}
+
+function renderSettingsPreset() {
+  const p = getActivePreset();
+  $('settingsPresetBody').innerHTML = buildPlanCardHTML(p, { showSelector: true, inline: false });
+  bindPlanCard($('settingsPresetBody'), { showSelector: true, inline: false });
+}
+
+function renderActivities() {
+  const container = $('allTags');
+  container.innerHTML = state.activities.map((a, i) => `
+    <span class="activity-tag">
+      ${escapeHtml(a)}
+      <span class="remove" data-index="${i}" title="删除">✕</span>
+    </span>
+  `).join('') + `<button type="button" class="activity-tag add-tag" id="addActivityBtn">＋ 添加事件</button>`;
+
+  container.querySelectorAll('.remove').forEach(el => {
+    el.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      const idx = +el.dataset.index;
+      if (state.activities.length <= 1) { showToast('至少保留一个事件'); return; }
+      const removed = state.activities[idx];
+      state.activities.splice(idx, 1);
+      state.presets.forEach(p => {
+        if (p.focusEvent === removed) p.focusEvent = state.activities[0] || '';
+        if (p.shortRestEvent === removed) p.shortRestEvent = state.activities[0] || '';
+        if (p.longRestEvent === removed) p.longRestEvent = state.activities[0] || '';
+      });
+      saveActivities();
+      renderActivities(); renderActivityOptions(); renderPomoPresetBody(); renderSettingsPreset(); applyPomodoroPreset(); renderPomodoro();
+    });
+  });
+
+  $('addActivityBtn').addEventListener('click', e => {
+    e.preventDefault(); e.stopPropagation();
+    if ($('activityAddEditor')) return;
+    const editor = document.createElement('div');
+    editor.className = 'activity-add-editor';
+    editor.id = 'activityAddEditor';
+    editor.innerHTML = `<input id="activityAddInput" type="text" maxlength="30" placeholder="输入事件名称"><button type="button" class="confirm" id="activityAddConfirm">添加</button><button type="button" id="activityAddCancel">取消</button>`;
+    container.appendChild(editor);
+    const input = $('activityAddInput');
+    input.focus();
+    const close = () => editor.remove();
+    const add = () => {
+      const name = input.value.trim();
+      if (!name) { input.focus(); showToast('请输入事件名称'); return; }
+      if (state.activities.includes(name)) { input.focus(); showToast('该事件已存在'); return; }
+      state.activities.push(name);
+      saveActivities();
+      renderActivities(); renderActivityOptions(); renderPomoPresetBody(); renderSettingsPreset();
+      showToast(`已添加「${name}」`);
+    };
+    $('activityAddConfirm').addEventListener('click', add);
+    $('activityAddCancel').addEventListener('click', close);
+    input.addEventListener('keydown', e => { if(e.key==='Enter') add(); if(e.key==='Escape') close(); });
+  });
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[ch]));
+}
+function saveActivities(){ try{ localStorage.setItem('pomodoro_activities_v2', JSON.stringify(state.activities)); }catch(e){} }
+function loadActivities(){ try{ const x=JSON.parse(localStorage.getItem('pomodoro_activities_v2')||'null'); if(Array.isArray(x)&&x.length) state.activities=x; }catch(e){} }
+
+document.querySelectorAll('[data-visual-toggle]').forEach(el=>el.addEventListener('click',()=>$(el.dataset.visualToggle)?.classList.toggle('open')));
+document.querySelectorAll('.visual-mode-card').forEach(el=>el.addEventListener('click',()=>{ state.visual.mode=el.dataset.mode; applyVisualMode(); saveVisualState(); }));
+$('darkModeToggle').addEventListener('change', e=>{state.visual.darkMode=e.target.checked;state.visual.followSystem=false;applyTheme();saveVisualState();});
+$('followSystemToggle').addEventListener('change', e=>{state.visual.followSystem=e.target.checked;applyTheme();saveVisualState();});
+$('hideAllTextToggle').addEventListener('change', e=>{state.visual.hideAllText=e.target.checked;applyTheme();saveVisualState();});
+$('hideNumberToggle').addEventListener('change', e=>{state.visual.hideNumber=e.target.checked;applyVisualMode();saveVisualState();});
+$('pomoFontFamilySelect').addEventListener('change', e=>{state.visual.pomoFontFamily=e.target.value;applyTheme();applyVisualMode();saveVisualState();});
+$('pomoFontSizeRange').addEventListener('input', e=>{state.visual.pomoFontSize=+e.target.value;applyTheme();applyVisualMode();saveVisualState();});
+$('pomoFontWeightRange').addEventListener('input', e=>{state.visual.pomoFontWeight=+e.target.value;applyTheme();applyVisualMode();saveVisualState();});
+$('addThemeBtn').addEventListener('click',()=>{
+  state.visual.customThemes.push({
+    name:`自定义${state.visual.customThemes.length+1}`,
+    work:'#e53e3e',
+    shortBreak:'#38a169',
+    longBreak:'#3182ce',
+    pause:'#718096',
+    bg:'#f5f5f7',
+    surface:'#ffffff',
+    window:'#fafafa',
+    text:'#1d1d1f'
+  });
+  state.visual.customThemeIndex=state.visual.customThemes.length-1;
+  state.visual.theme='custom';
+  renderThemeControls();
+  applyTheme();
+  saveVisualState();
+  showToast('已新建自定义颜色');
+});
+$('saveThemePresetBtn').addEventListener('click',()=>{
+  const t=state.visual.customThemes[state.visual.customThemeIndex];
+  if(!t){showToast('请先创建或选择一个自定义颜色');return;}
+  state.visual.savedPresets.push({...t,pause:t.pause||'#718096',text:t.text||'#1d1d1f',surface:t.surface||'#ffffff',window:t.window||'#fafafa',name:t.name||`预设${state.visual.savedPresets.length+1}`});
+  state.visual.theme='saved';
+  state.visual.savedPresetIndex=state.visual.savedPresets.length-1;
+  renderThemeControls();
+  applyTheme();
+  saveVisualState();
+  showToast('已保存为预设颜色');
+});
+window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change',()=>{if(state.visual.followSystem)applyTheme();});
+
+function init() {
+  loadVisualState();
+  loadActivities();
+  renderActivityOptions();
+  renderTimerView();
+
+  applyPomodoroPreset();
+  applyVisualMode();
+  renderPomodoro();
+  renderPomoPresetBody();
+
+  renderHistory();
+  renderSettingsPreset();
+  renderActivities();
+
+  $('pomoPresetCollapsible').classList.remove('open');
+  
+  document.querySelectorAll('.visual-mode-card').forEach(el => el.classList.toggle('active', el.dataset.mode === state.visual.mode));
+  applyTheme();
+  
+  $('settingsPresetSection').classList.remove('open');
+  $('settingsEventSection').classList.remove('open');
+  $('settingsVisualSection').classList.remove('open');
+  
+  document.querySelectorAll('.visual-subsection').forEach(el => el.classList.remove('open'));
+}
+init();
+</script>
+</body>
+</html>
